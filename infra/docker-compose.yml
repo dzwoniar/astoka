@@ -1,0 +1,246 @@
+# Astoka local + single-server stack.
+# Usage: from repo root, `make up` (uses .env).
+# Network: `astoka` shared by all services. Volumes persist in `infra/data/`.
+
+name: astoka
+
+networks:
+  astoka:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  ollama_data:
+
+services:
+  postgres:
+    # pgvector/pgvector ships pgvector ext (PRD §8 — reserved for Faza 2 semantic search,
+    # enabled now to avoid migration churn).
+    image: pgvector/pgvector:pg16
+    container_name: astoka-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [astoka]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: astoka-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [astoka]
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: astoka-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_PORT}:9000"
+      - "${MINIO_CONSOLE_PORT}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [astoka]
+    restart: unless-stopped
+
+  minio-init:
+    # One-shot job: creates the default bucket on first stack start.
+    image: minio/mc:latest
+    container_name: astoka-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing local/${MINIO_BUCKET};
+      mc anonymous set download local/${MINIO_BUCKET};
+      echo 'MinIO bucket ${MINIO_BUCKET} ready';
+      "
+    networks: [astoka]
+    restart: "no"
+
+  ollama:
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    container_name: astoka-ollama
+    environment:
+      OLLAMA_MODEL: ${OLLAMA_MODEL}
+      OLLAMA_KEEP_ALIVE: "10m"
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "${OLLAMA_PORT}:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks: [astoka]
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../services/api
+      dockerfile: Dockerfile
+    container_name: astoka-api
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      OLLAMA_URL: http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    ports:
+      - "${API_PORT}:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - ../services/api:/app
+      - ../scripts:/app/scripts:ro
+    networks: [astoka]
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../services/worker
+      dockerfile: Dockerfile
+    container_name: astoka-worker
+    env_file: ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      OLLAMA_URL: http://ollama:11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ../services/worker:/app
+      - ../services/highlight:/app/highlight:ro
+      - ../scripts:/app/scripts:ro
+    networks: [astoka]
+    restart: unless-stopped
+
+  flower:
+    image: mher/flower:2.0
+    container_name: astoka-flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555 --basic_auth=${FLOWER_USER}:${FLOWER_PASSWORD}
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${FLOWER_PORT}:5555"
+    networks: [astoka]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: astoka-web
+    env_file: ../.env
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - ../apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    networks: [astoka]
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.1
+    container_name: astoka-traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+    volumes:
+      - ./traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+      - ./traefik/certs:/etc/traefik/certs:ro
+    ports:
+      - "${TRAEFIK_HTTP_PORT}:80"
+      - "${TRAEFIK_HTTPS_PORT}:443"
+      - "${TRAEFIK_DASHBOARD_PORT}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    networks: [astoka]
+    restart: unless-stopped

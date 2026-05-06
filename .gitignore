@@ -1,0 +1,56 @@
+# Node
+node_modules/
+.next/
+.turbo/
+dist/
+build/
+*.tsbuildinfo
+.eslintcache
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Docker volumes / data
+infra/data/
+infra/traefik/certs/*.pem
+infra/traefik/certs/*.key
+
+# Build artifacts
+*.log
+*.pid
+
+# ML models / large files
+models/
+*.bin
+*.gguf
+*.safetensors
+
+# ASR spike samples (real recordings — never commit)
+scripts/data/akademia_samples/*
+!scripts/data/akademia_samples/.gitkeep
+
+# Generated
+packages/shared/src/api-types.ts
+packages/shared/dist/

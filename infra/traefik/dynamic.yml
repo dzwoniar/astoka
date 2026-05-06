@@ -1,0 +1,63 @@
+# Traefik dynamic config: routing rules + TLS.
+# Self-signed cert for MVP (NFR-SEC-05); Let's Encrypt deferred to Faza 2 jeśli ekspozycja zewnętrzna.
+
+http:
+  routers:
+    web:
+      rule: "Host(`astoka.local`) && !PathPrefix(`/api`)"
+      entrypoints: [websecure]
+      service: web
+      tls: {}
+
+    api:
+      rule: "Host(`astoka.local`) && PathPrefix(`/api`)"
+      entrypoints: [websecure]
+      service: api
+      tls: {}
+      middlewares: [strip-api]
+
+    flower:
+      rule: "Host(`flower.astoka.local`)"
+      entrypoints: [websecure]
+      service: flower
+      tls: {}
+
+    minio-console:
+      rule: "Host(`minio.astoka.local`)"
+      entrypoints: [websecure]
+      service: minio-console
+      tls: {}
+
+  middlewares:
+    strip-api:
+      stripPrefix:
+        prefixes: ["/api"]
+
+  services:
+    web:
+      loadBalancer:
+        servers:
+          - url: "http://web:3000"
+
+    api:
+      loadBalancer:
+        servers:
+          - url: "http://api:8000"
+
+    flower:
+      loadBalancer:
+        servers:
+          - url: "http://flower:5555"
+
+    minio-console:
+      loadBalancer:
+        servers:
+          - url: "http://minio:9001"
+
+tls:
+  certificates:
+    - certFile: /etc/traefik/certs/astoka.local.pem
+      keyFile: /etc/traefik/certs/astoka.local.key
+  options:
+    default:
+      minVersion: VersionTLS12

@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-lint-test:
+    name: Python — lint + type-check + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install root dev tooling
+        run: pip install ruff mypy pytest pytest-asyncio
+
+      - name: Install API service
+        working-directory: services/api
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Install worker service
+        working-directory: services/worker
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Install highlight service
+        working-directory: services/highlight
+        run: uv pip install --system -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check services/
+
+      - name: Mypy (api)
+        working-directory: services/api
+        run: mypy astoka_api
+
+      - name: Mypy (worker)
+        working-directory: services/worker
+        run: mypy astoka_worker
+
+      - name: Pytest (highlight vendor)
+        run: pytest services/highlight/tests -v
+
+      - name: Pytest (api)
+        working-directory: services/api
+        run: pytest tests -v
+
+      - name: Pytest (worker)
+        working-directory: services/worker
+        run: pytest tests -v
+
+  web-lint-test:
+    name: Web — lint + type-check + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Lint
+        run: pnpm --filter @astoka/web lint
+
+      - name: Type-check
+        run: pnpm --filter @astoka/web type-check
+
+  docker-compose-validate:
+    name: Docker Compose — config validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy .env.example to .env
+        run: cp .env.example .env
+      - name: Validate compose config
+        run: docker compose -f infra/docker-compose.yml --env-file .env config >/dev/null

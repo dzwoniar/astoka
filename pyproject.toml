@@ -1,0 +1,49 @@
+# Root pyproject for shared dev tooling (ruff, mypy) across services/*.
+# Each service has its own pyproject.toml for runtime deps.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["services/api", "services/worker", "services/highlight"]
+extend-exclude = ["services/highlight/astoka_highlight/vendor"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "UP",   # pyupgrade
+    "RUF",  # ruff-specific
+    "N",    # pep8-naming
+]
+ignore = [
+    "E501",  # line too long (formatter handles it)
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+no_implicit_optional = true
+exclude = ["services/highlight/vendor/", ".venv/", "build/"]
+
+[[tool.mypy.overrides]]
+module = ["faster_whisper.*", "whisperx.*", "ultralytics.*", "scenedetect.*", "silero_vad.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# Each service is installed and tested independently (see CI). Run pytest from inside
+# the service dir, not from repo root, so module paths resolve cleanly.
+minversion = "8.0"
+python_files = ["test_*.py"]
+asyncio_mode = "auto"

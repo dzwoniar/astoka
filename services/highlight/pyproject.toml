@@ -1,0 +1,29 @@
+[project]
+name = "astoka-highlight"
+version = "0.1.0"
+description = "Astoka highlight detection pipeline (heuristics + LLM reranking)"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "pydantic>=2.9.0",
+    "pyyaml>=6.0.2",
+    "numpy>=1.26.0",
+    # ML deps wired per-sprint:
+    # Sprint 2 ASR: faster-whisper>=1.0.3, whisperx>=3.1
+    # Sprint 3 VAD: silero-vad>=5.1
+    # Sprint 4 highlight: scenedetect, ultralytics, librosa
+    # Sprint 5 reframe: ultralytics (YOLOv11s), bytetracker
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["astoka_highlight"]
