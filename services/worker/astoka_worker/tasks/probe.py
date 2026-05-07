@@ -30,7 +30,7 @@ from astoka_worker.util.storage import download_file, stat_object, upload_file
 
 
 @celery_app.task(name="astoka.probe", bind=True, max_retries=2)
-def probe_metadata(self, source_material_id: str, job_id: str) -> str:  # type: ignore[no-untyped-def]
+def probe_metadata(self, source_material_id: str, job_id: str) -> str:
     """Probe a source_material → fill metadata + create proxy preview.
 
     Returns the source_material_id so a Celery chain can pass it to the next task.

@@ -19,7 +19,7 @@ def ffprobe_metadata(input_path: str) -> dict[str, Any]:
         input_path,
     ]
     out = subprocess.check_output(cmd, text=True, timeout=120)
-    return json.loads(out)  # type: ignore[no-any-return]
+    return json.loads(out)
 
 
 def extract_basic_metadata(probe: dict[str, Any]) -> dict[str, Any]:

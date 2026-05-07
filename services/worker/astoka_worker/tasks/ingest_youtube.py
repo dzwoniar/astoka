@@ -19,7 +19,7 @@ from astoka_worker.util.storage import upload_file
 
 
 @celery_app.task(name="astoka.ingest.youtube", bind=True, max_retries=2)
-def download_youtube(self, source_material_id: str, job_id: str) -> str:  # type: ignore[no-untyped-def]
+def download_youtube(self, source_material_id: str, job_id: str) -> str:
     """Download a YouTube URL via yt-dlp → MinIO → trigger probe job."""
     import yt_dlp  # imported here to keep tests cheap
 

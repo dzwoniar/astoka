@@ -52,3 +52,85 @@ export interface ApiError {
   detail: string;
   status?: number;
 }
+
+// === Source materials + jobs (Phase B) ===
+
+export type SourceType = "upload" | "youtube";
+
+export type JobType =
+  | "youtube_download"
+  | "probe"
+  | "proxy_preview"
+  | "asr"
+  | "highlight"
+  | "render";
+
+export type JobStatus = "pending" | "running" | "succeeded" | "failed" | "cancelled";
+
+export interface SourceMaterialResponse {
+  id: string;
+  project_id: string;
+  source_type: SourceType;
+  original_filename: string | null;
+  youtube_url: string | null;
+  storage_key: string | null;
+  proxy_storage_key: string | null;
+  thumbnail_storage_key: string | null;
+  duration_s: number | null;
+  width: number | null;
+  height: number | null;
+  fps: number | null;
+  bytes_size: number | null;
+  detected_language: string | null;
+  extra_metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JobResponse {
+  id: string;
+  source_material_id: string;
+  job_type: JobType;
+  status: JobStatus;
+  progress: number;
+  progress_message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+  result: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UploadInitRequest {
+  filename: string;
+  content_type?: string;
+  bytes_size?: number;
+}
+
+export interface UploadInitResponse {
+  source_material_id: string;
+  storage_key: string;
+  presigned_put_url: string;
+}
+
+export interface UploadCompleteRequest {
+  source_material_id: string;
+  content_hash?: string;
+}
+
+export interface YouTubeIngestRequest {
+  url: string;
+}
+
+export interface JobUpdateEvent {
+  event: "job_update";
+  project_id: string;
+  source_material_id: string;
+  job_id: string;
+  job_type: JobType;
+  status: JobStatus;
+  progress: number;
+  progress_message: string | null;
+  error_message: string | null;
+}

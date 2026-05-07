@@ -4,13 +4,19 @@
 import type {
   ApiError,
   ArchiveFilter,
+  JobResponse,
   LoginRequest,
   ProjectCreate,
   ProjectListResponse,
   ProjectResponse,
   ProjectSortField,
   ProjectUpdate,
+  SourceMaterialResponse,
+  UploadCompleteRequest,
+  UploadInitRequest,
+  UploadInitResponse,
   UserResponse,
+  YouTubeIngestRequest,
 } from "./api-types";
 
 // In dev, Next.js rewrites /api/* → http://api:8000/* (see next.config.mjs).
@@ -116,5 +122,72 @@ export const projectsApi = {
   hardDelete: (id: string) =>
     apiCall<void>(`/projects/${id}/hard`, { method: "DELETE" }),
 };
+
+// === Ingest (Phase B) ===
+
+export const ingestApi = {
+  listSourceMaterials: (projectId: string) =>
+    apiCall<SourceMaterialResponse[]>(`/projects/${projectId}/source-materials`),
+
+  uploadInit: (projectId: string, body: UploadInitRequest) =>
+    apiCall<UploadInitResponse>(`/projects/${projectId}/uploads/init`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  uploadComplete: (projectId: string, body: UploadCompleteRequest) =>
+    apiCall<SourceMaterialResponse>(`/projects/${projectId}/uploads/complete`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  youtube: (projectId: string, body: YouTubeIngestRequest) =>
+    apiCall<SourceMaterialResponse>(`/projects/${projectId}/youtube`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  listJobs: (projectId: string) =>
+    apiCall<JobResponse[]>(`/projects/${projectId}/jobs`),
+};
+
+/**
+ * Upload a File directly to MinIO via presigned PUT URL, then notify backend.
+ * Returns the SourceMaterial after backend kicks off probe pipeline.
+ */
+export async function uploadFile(
+  projectId: string,
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<SourceMaterialResponse> {
+  const init = await ingestApi.uploadInit(projectId, {
+    filename: file.name,
+    content_type: file.type || undefined,
+    bytes_size: file.size,
+  });
+
+  // PUT directly to MinIO. fetch() doesn't expose progress; use XMLHttpRequest
+  // for upload progress events.
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener("progress", (ev) => {
+      if (ev.lengthComputable && onProgress) {
+        onProgress(ev.loaded / ev.total);
+      }
+    });
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Upload failed with HTTP ${xhr.status}`));
+    });
+    xhr.addEventListener("error", () => reject(new Error("Upload network error")));
+    xhr.open("PUT", init.presigned_put_url, true);
+    if (file.type) xhr.setRequestHeader("Content-Type", file.type);
+    xhr.send(file);
+  });
+
+  return ingestApi.uploadComplete(projectId, {
+    source_material_id: init.source_material_id,
+  });
+}
 
 export { HttpError };

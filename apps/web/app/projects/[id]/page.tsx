@@ -1,36 +1,95 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import * as React from "react";
 
 import { Protected } from "@/components/auth/protected";
+import { IngestControls } from "@/components/projects/ingest-controls";
+import { SourceMaterialList } from "@/components/projects/source-material-list";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { projectsApi, HttpError } from "@/lib/api-client";
-import type { ProjectResponse } from "@/lib/api-types";
+import { HttpError, ingestApi, projectsApi } from "@/lib/api-client";
+import type {
+  JobResponse,
+  ProjectResponse,
+  SourceMaterialResponse,
+} from "@/lib/api-types";
+import { useProjectEvents } from "@/lib/use-project-events";
 
 function ProjectDetail() {
   const params = useParams<{ id: string }>();
-  const router = useRouter();
+  const id = params?.id;
+
   const [project, setProject] = React.useState<ProjectResponse | null>(null);
+  const [sourceMaterials, setSourceMaterials] = React.useState<SourceMaterialResponse[]>(
+    [],
+  );
+  const [jobs, setJobs] = React.useState<JobResponse[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [archiving, setArchiving] = React.useState(false);
 
-  const id = params?.id;
+  const refresh = React.useCallback(async () => {
+    if (!id) return;
+    try {
+      const [p, sms, js] = await Promise.all([
+        projectsApi.get(id),
+        ingestApi.listSourceMaterials(id),
+        ingestApi.listJobs(id),
+      ]);
+      setProject(p);
+      setSourceMaterials(sms);
+      setJobs(js);
+    } catch (err) {
+      setError(err instanceof HttpError ? err.detail : "Failed to load project");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
 
   React.useEffect(() => {
-    if (!id) return;
-    setLoading(true);
-    projectsApi
-      .get(id)
-      .then(setProject)
-      .catch((err) => {
-        setError(err instanceof HttpError ? err.detail : "Failed to load project");
-      })
-      .finally(() => setLoading(false));
-  }, [id]);
+    void refresh();
+  }, [refresh]);
+
+  const { connected } = useProjectEvents(id, (ev) => {
+    setJobs((prev) => {
+      // Update existing or insert new.
+      const idx = prev.findIndex((j) => j.id === ev.job_id);
+      const updatedJob: JobResponse = {
+        id: ev.job_id,
+        source_material_id: ev.source_material_id,
+        job_type: ev.job_type,
+        status: ev.status,
+        progress: ev.progress,
+        progress_message: ev.progress_message,
+        started_at: idx >= 0 ? prev[idx].started_at : null,
+        finished_at:
+          ev.status === "succeeded" || ev.status === "failed"
+            ? new Date().toISOString()
+            : idx >= 0
+              ? prev[idx].finished_at
+              : null,
+        error_message: ev.error_message,
+        result: idx >= 0 ? prev[idx].result : {},
+        created_at: idx >= 0 ? prev[idx].created_at : new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = updatedJob;
+        return next;
+      }
+      return [...prev, updatedJob];
+    });
+    // Refresh source_material list when a job completes (metadata may have changed).
+    if (ev.status === "succeeded" || ev.status === "failed") {
+      void ingestApi
+        .listSourceMaterials(id ?? "")
+        .then(setSourceMaterials)
+        .catch(() => undefined);
+    }
+  });
 
   const archive = async () => {
     if (!project) return;
@@ -60,7 +119,9 @@ function ProjectDetail() {
 
   if (loading) {
     return (
-      <main className="container py-8 text-center text-muted-foreground">Ładowanie...</main>
+      <main className="container py-8 text-center text-muted-foreground">
+        Ładowanie...
+      </main>
     );
   }
   if (error || !project) {
@@ -85,11 +146,20 @@ function ProjectDetail() {
           {project.client ? (
             <p className="text-sm text-muted-foreground">Klient: {project.client}</p>
           ) : null}
-          {project.is_archived ? (
-            <span className="mt-2 inline-block rounded-full bg-muted px-2 py-1 text-xs">
-              archived
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            {project.is_archived ? (
+              <span className="rounded-full bg-muted px-2 py-1">archived</span>
+            ) : null}
+            <span
+              className={`rounded-full px-2 py-1 ${
+                connected
+                  ? "bg-green-500/20 text-green-300"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              SSE: {connected ? "online" : "offline"}
             </span>
-          ) : null}
+          </div>
         </div>
         <div className="flex gap-2">
           {project.is_archived ? (
@@ -104,44 +174,27 @@ function ProjectDetail() {
         </div>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
+      {!project.is_archived ? (
+        <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-lg">Materiały źródłowe</CardTitle>
+            <CardTitle className="text-lg">Dodaj materiał</CardTitle>
           </CardHeader>
           <CardContent>
-            {project.source_materials_count === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Brak materiałów. Wgrywanie i pipeline pojawi się w Phase B (ingest) tego sprintu.
-              </p>
-            ) : (
-              <p>{project.source_materials_count} materiał(ów)</p>
-            )}
+            <IngestControls projectId={project.id} onIngested={refresh} />
           </CardContent>
         </Card>
+      ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Wygenerowane klipy</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {project.clips_count === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Brak klipów. Pojawią się po wgraniu materiału + analizie.
-              </p>
-            ) : (
-              <p>{project.clips_count} klip(ów)</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <details className="mt-8">
-        <summary className="cursor-pointer text-sm text-muted-foreground">Surowe dane</summary>
-        <pre className="mt-2 overflow-auto rounded-md border bg-muted p-3 text-xs">
-          {JSON.stringify(project, null, 2)}
-        </pre>
-      </details>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            Materiały źródłowe ({sourceMaterials.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SourceMaterialList sourceMaterials={sourceMaterials} jobs={jobs} />
+        </CardContent>
+      </Card>
     </main>
   );
 }
