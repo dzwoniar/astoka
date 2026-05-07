@@ -51,28 +51,36 @@ Sprint 1 ("Demo Backbone") jest w trakcie — zob. plan w `/root/.claude/plans/.
 
 | Phase | Status | Co działa |
 |---|---|---|
-| Sprint 0 | ✅ Done | Docker stack, healthcheck, ASR spike, vendor extracts (chunking + dedupe + prompt) |
-| Phase A.1 | ✅ Done | Pełen DB schema + Alembic 0001 |
-| Phase A.2 | ✅ Done | Auth: bcrypt + JWT cookie + seed CLI |
-| Phase A.3 | ✅ Done | Projects CRUD API |
-| Phase A.5 | ✅ Done | Web: login + projects list + new + detail |
-| Phase E.2/E.3 | ✅ Done | docker-compose.dev.yml + `make install` |
-| Phase B | 🚧 In progress | Ingest API + workers (upload, yt-dlp, probe, proxy) |
-| Phase C | ⏳ Pending | ASR pipeline (faster-whisper) |
-| Phase D | ⏳ Pending | Highlight detection (heuristics + Ollama LLM) |
-| Phase E.1 | ⏳ Pending | TanStack Query + SSE for live status |
-| Phase E.5 | ⏳ Pending | Playwright E2E |
+| Sprint 0 | ✅ Done | Docker stack, healthcheck, ASR spike, vendor extracts |
+| Phase A | ✅ Done | DB schema + auth + projects CRUD + web (login + projects list/new/detail) |
+| Phase B | ✅ Done | Ingest API + workers (upload, yt-dlp, probe, proxy_preview) + SSE events + ingest UI |
+| Phase C | ✅ Done | ASR worker (faster-whisper word_timestamps, lazy model download, hash cache) + transcript view |
+| Phase D | ✅ Done | Highlight detection (heuristics + Ollama LLM with heuristic fallback + audio-corrected boundaries + IoU dedupe) + accept/reject UI |
+| Phase E.2/3/4 | ✅ Done | docker-compose.dev.yml + `make install` + README |
+| Phase E.1 | 🟡 Inline (in-page state) | SSE+manual refresh works; full TanStack Query refactor deferred to next sprint |
+| Phase E.5 | ⏳ Pending | Playwright E2E (manual demo flow works) |
 
-**Co możesz przetestować TERAZ (po `make install`):**
-- Login admin/admin
-- Tworzenie projektów (z opcjonalnym polem klient)
-- Lista projektów z sortowaniem i filtrem (aktywne/zarchiwizowane/wszystkie)
-- Soft-delete (archiwizacja) + restore + hard-delete
+**Co możesz przetestować TERAZ (po `make install` lub `make install-gpu`):**
 
-**Co jeszcze nie działa:**
-- Upload pliku / YouTube URL (Phase B)
-- ASR / transkrypcja (Phase C)
-- Highlight detection (Phase D)
+End-to-end golden path:
+1. `make install-gpu` (lub `make install` dla CPU-only z heuristic fallback)
+2. Open http://localhost:3000, login admin/admin
+3. **Nowy projekt** → wpisz nazwę → Utwórz
+4. Wklej YouTube URL (np. krótki webinar Akademii) → ✓ ToS → Pobierz
+5. SSE pokazuje pipeline live:
+   - `youtube_download` (~10-30s)
+   - `probe` (ffprobe + 480p proxy, ~30-60s)
+   - `asr` (~realtime na CPU, ~0.1× realtime na GPU; pierwszy run pobiera ~1.5 GB)
+   - `highlight` (~5-10s heurystyki + ~30-60s Ollama lub instant fallback)
+6. Transkrypcja pojawia się klikalna word-by-word
+7. 3-7 propozycji highlightów z hookiem, score, typology badge — Akceptuj/Odrzuć
+
+**Co jeszcze nie działa (kolejne sprinty):**
+- Render gotowego MP4 (Sprint 5: cięcie + reframe + captions burn-in)
+- Reframe 9:16 z trackingiem twarzy (Sprint 5)
+- Captions ASS w 2 stylach (Sprint 6)
+- Edycja transkrypcji + filler removal (Sprint 7 numering)
+- Multi-user auth (Sprint 8)
 
 ---
 
