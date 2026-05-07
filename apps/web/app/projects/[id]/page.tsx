@@ -5,8 +5,10 @@ import { useParams } from "next/navigation";
 import * as React from "react";
 
 import { Protected } from "@/components/auth/protected";
+import { HighlightList } from "@/components/projects/highlight-list";
 import { IngestControls } from "@/components/projects/ingest-controls";
 import { SourceMaterialList } from "@/components/projects/source-material-list";
+import { TranscriptView } from "@/components/projects/transcript-view";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HttpError, ingestApi, projectsApi } from "@/lib/api-client";
@@ -185,7 +187,7 @@ function ProjectDetail() {
         </Card>
       ) : null}
 
-      <Card>
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-lg">
             Materiały źródłowe ({sourceMaterials.length})
@@ -195,6 +197,28 @@ function ProjectDetail() {
           <SourceMaterialList sourceMaterials={sourceMaterials} jobs={jobs} />
         </CardContent>
       </Card>
+
+      {sourceMaterials.length > 0 ? (
+        <>
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-lg">Transkrypcja</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TranscriptView sourceMaterialId={sourceMaterials[0].id} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Highlights</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <HighlightList projectId={project.id} refreshKey={jobs.length} />
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
     </main>
   );
 }

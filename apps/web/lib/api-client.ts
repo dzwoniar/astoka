@@ -4,6 +4,7 @@
 import type {
   ApiError,
   ArchiveFilter,
+  HighlightResponse,
   JobResponse,
   LoginRequest,
   ProjectCreate,
@@ -12,6 +13,7 @@ import type {
   ProjectSortField,
   ProjectUpdate,
   SourceMaterialResponse,
+  TranscriptResponse,
   UploadCompleteRequest,
   UploadInitRequest,
   UploadInitResponse,
@@ -149,6 +151,37 @@ export const ingestApi = {
 
   listJobs: (projectId: string) =>
     apiCall<JobResponse[]>(`/projects/${projectId}/jobs`),
+};
+
+// === Phase C/D ===
+
+export const transcriptsApi = {
+  get: (sourceMaterialId: string) =>
+    apiCall<TranscriptResponse>(
+      `/source-materials/${sourceMaterialId}/transcript`,
+    ),
+};
+
+export const highlightsApi = {
+  list: (projectId: string, includeArchived = false) =>
+    apiCall<HighlightResponse[]>(
+      `/projects/${projectId}/highlights${includeArchived ? "?include_archived=true" : ""}`,
+    ),
+
+  accept: (highlightId: string) =>
+    apiCall<HighlightResponse>(`/highlights/${highlightId}/accept`, {
+      method: "POST",
+    }),
+
+  reject: (highlightId: string) =>
+    apiCall<HighlightResponse>(`/highlights/${highlightId}/reject`, {
+      method: "POST",
+    }),
+
+  hide: (highlightId: string) =>
+    apiCall<HighlightResponse>(`/highlights/${highlightId}/hide`, {
+      method: "POST",
+    }),
 };
 
 /**

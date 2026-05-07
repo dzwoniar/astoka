@@ -23,6 +23,8 @@ celery_app = Celery(
         "astoka_worker.tasks.health",
         "astoka_worker.tasks.probe",
         "astoka_worker.tasks.ingest_youtube",
+        "astoka_worker.tasks.asr",
+        "astoka_worker.tasks.highlights",
     ],
 )
 

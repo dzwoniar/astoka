@@ -134,3 +134,52 @@ export interface JobUpdateEvent {
   progress_message: string | null;
   error_message: string | null;
 }
+
+// === Phase C/D ===
+
+export interface TranscriptWord {
+  text: string;
+  start: number;
+  end: number;
+  confidence: number;
+}
+
+export interface TranscriptSegment {
+  text: string;
+  start: number;
+  end: number;
+  words: TranscriptWord[];
+}
+
+export interface TranscriptResponse {
+  id: string;
+  source_material_id: string;
+  language: string;
+  model_id: string;
+  alignment_method: string;
+  full_text: string;
+  segments_json: TranscriptSegment[];
+  avg_confidence: number | null;
+  created_at: string;
+}
+
+export type HighlightStatus = "pending" | "accepted" | "rejected" | "hidden";
+
+export interface HighlightResponse {
+  id: string;
+  source_material_id: string;
+  start_s: number;
+  end_s: number;
+  audio_corrected: boolean;
+  viral_score: number;
+  confidence: number | null;
+  typology: string | null;
+  hook_sentence: string | null;
+  virality_reason: string | null;
+  suggested_title: string | null;
+  llm_provider: string;
+  feature_scores: Record<string, number>;
+  status: HighlightStatus;
+  created_at: string;
+  updated_at: string;
+}
