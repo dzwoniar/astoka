@@ -48,7 +48,7 @@ async def _check_redis() -> DependencyStatus:
     try:
         import redis.asyncio as redis_async
 
-        client = redis_async.from_url(settings.redis_url)  # type: ignore[no-untyped-call]
+        client = redis_async.from_url(settings.redis_url)
         await client.ping()
         await client.aclose()
         return DependencyStatus(name="redis", ok=True)

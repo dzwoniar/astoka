@@ -46,7 +46,9 @@ jobs:
 
       - name: Mypy (api)
         working-directory: services/api
-        run: mypy astoka_api
+        # Print verbose output so any future failure is visible in the action log
+        # without needing to fetch the raw run.
+        run: mypy --show-error-codes --show-error-context astoka_api
 
       - name: Mypy (worker)
         working-directory: services/worker
