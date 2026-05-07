@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from astoka_api import __version__
 from astoka_api.config import get_settings
 from astoka_api.health import router as health_router
+from astoka_api.routers.auth import router as auth_router
+from astoka_api.routers.projects import router as projects_router
 
 
 @asynccontextmanager
@@ -34,6 +36,8 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
+    app.include_router(auth_router)
+    app.include_router(projects_router)
     return app
 
 

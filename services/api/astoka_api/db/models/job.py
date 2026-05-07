@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from astoka_api.db.models.source_material import SourceMaterial
 
 
-class JobType(str, enum.Enum):
+class JobType(enum.StrEnum):
     YOUTUBE_DOWNLOAD = "youtube_download"
     PROBE = "probe"
     PROXY_PREVIEW = "proxy_preview"
@@ -30,7 +30,7 @@ class JobType(str, enum.Enum):
     RENDER = "render"  # Sprint 5+
 
 
-class JobStatus(str, enum.Enum):
+class JobStatus(enum.StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     SUCCEEDED = "succeeded"

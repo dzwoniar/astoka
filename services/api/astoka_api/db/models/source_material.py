@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from astoka_api.db.models.transcript import Transcript
 
 
-class SourceType(str, enum.Enum):
+class SourceType(enum.StrEnum):
     UPLOAD = "upload"
     YOUTUBE = "youtube"
 

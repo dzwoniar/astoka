@@ -26,7 +26,8 @@ jobs:
         run: pip install uv
 
       - name: Install root dev tooling
-        run: pip install ruff mypy pytest pytest-asyncio
+        # Pin tool versions for CI stability — bumps go through PR.
+        run: pip install 'ruff==0.15.12' 'mypy==1.20.2' 'pytest>=8.3' 'pytest-asyncio>=0.24'
 
       - name: Install API service
         working-directory: services/api

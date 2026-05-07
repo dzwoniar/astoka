@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from astoka_api.db.models.source_material import SourceMaterial
 
 
-class HighlightStatus(str, enum.Enum):
+class HighlightStatus(enum.StrEnum):
     PENDING = "pending"  # newly generated, awaiting user review
     ACCEPTED = "accepted"  # user accepted, will be rendered later
     REJECTED = "rejected"  # user rejected, hidden from main view but kept in archive
