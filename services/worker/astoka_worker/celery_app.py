@@ -19,7 +19,11 @@ celery_app = Celery(
     "astoka",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["astoka_worker.tasks.health"],
+    include=[
+        "astoka_worker.tasks.health",
+        "astoka_worker.tasks.probe",
+        "astoka_worker.tasks.ingest_youtube",
+    ],
 )
 
 celery_app.conf.update(

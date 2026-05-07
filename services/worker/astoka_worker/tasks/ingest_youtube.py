@@ -1,0 +1,151 @@
+"""yt-dlp download task. Saves to MinIO, then chains to probe."""
+
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from astoka_api.services import storage_service as api_storage
+from astoka_worker.celery_app import celery_app
+from astoka_worker.tasks._helpers import (
+    mark_failed,
+    mark_running,
+    mark_succeeded,
+    update_progress,
+)
+from astoka_worker.util.db import db_session
+from astoka_worker.util.storage import upload_file
+
+
+@celery_app.task(name="astoka.ingest.youtube", bind=True, max_retries=2)
+def download_youtube(self, source_material_id: str, job_id: str) -> str:  # type: ignore[no-untyped-def]
+    """Download a YouTube URL via yt-dlp → MinIO → trigger probe job."""
+    import yt_dlp  # imported here to keep tests cheap
+
+    with db_session() as session:
+        job, sm = mark_running(session, job_id, message="Pobieram z YouTube...")
+
+        if not sm.youtube_url:
+            mark_failed(session, job, sm, error="No youtube_url")
+            raise RuntimeError("no youtube_url")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_template = str(Path(tmpdir) / "%(id)s.%(ext)s")
+
+            # Progress hook receives dicts from yt-dlp during download.
+            last_pct: dict[str, float] = {"v": 0.0}
+
+            def progress_hook(d: dict[str, Any]) -> None:
+                if d.get("status") != "downloading":
+                    return
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                downloaded = d.get("downloaded_bytes") or 0
+                if total > 0:
+                    pct = downloaded / total
+                    # Throttle UI updates to ~5% steps.
+                    if pct - last_pct["v"] >= 0.05:
+                        last_pct["v"] = pct
+                        # Map download progress to 0.05..0.85 of the job.
+                        scaled = 0.05 + pct * 0.8
+                        # Use a fresh session via SQLAlchemy detached flush.
+                        with db_session() as inner:
+                            from astoka_api.db.models import Job, SourceMaterial
+
+                            inner_job = inner.get(Job, job.id)
+                            inner_sm = inner.get(SourceMaterial, sm.id)
+                            if inner_job and inner_sm:
+                                update_progress(
+                                    inner,
+                                    inner_job,
+                                    inner_sm,
+                                    progress=scaled,
+                                    message=f"Pobieram z YouTube... {pct:.0%}",
+                                )
+
+            ydl_opts = {
+                "outtmpl": output_template,
+                "format": "bestvideo[height<=1080]+bestaudio/best",
+                "merge_output_format": "mp4",
+                "noplaylist": True,
+                "quiet": True,
+                "progress_hooks": [progress_hook],
+                # Get thumbnail too.
+                "writethumbnail": True,
+            }
+
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(sm.youtube_url, download=True)
+                    file_path = ydl.prepare_filename(info)
+                    if not Path(file_path).exists():
+                        # yt-dlp might post-process: scan for produced file.
+                        candidates = list(Path(tmpdir).glob(f"*.{info.get('ext', 'mp4')}"))
+                        if candidates:
+                            file_path = str(candidates[0])
+
+                update_progress(session, job, sm, progress=0.9, message="Wysyłam do MinIO...")
+                ext = Path(file_path).suffix
+                fake_filename = f"{info.get('id', 'youtube')}{ext}"
+                storage_key = api_storage.storage_key_for_source(str(sm.id), fake_filename)
+                upload_file(file_path, storage_key)
+                sm.storage_key = storage_key
+                sm.original_filename = fake_filename
+
+                # Stash yt-dlp metadata.
+                extra = dict(sm.extra_metadata)
+                extra["yt_dlp"] = {
+                    "title": info.get("title"),
+                    "uploader": info.get("uploader"),
+                    "upload_date": info.get("upload_date"),
+                    "duration": info.get("duration"),
+                    "view_count": info.get("view_count"),
+                    "id": info.get("id"),
+                }
+                sm.extra_metadata = extra
+
+                # Optional thumbnail upload.
+                thumb_files = list(Path(tmpdir).glob("*.jpg")) + list(
+                    Path(tmpdir).glob("*.webp")
+                )
+                if thumb_files:
+                    thumb_key = api_storage.storage_key_for_thumbnail(str(sm.id))
+                    upload_file(str(thumb_files[0]), thumb_key)
+                    sm.thumbnail_storage_key = thumb_key
+
+                session.flush()
+
+                mark_succeeded(
+                    session,
+                    job,
+                    sm,
+                    result={
+                        "title": info.get("title"),
+                        "duration": info.get("duration"),
+                        "id": info.get("id"),
+                    },
+                )
+
+                # Chain to probe.
+
+                from astoka_api.db.models import Job, JobStatus, JobType
+
+                # Create probe job and trigger.
+                from astoka_worker.tasks.probe import probe_metadata
+
+                probe_job = Job(
+                    source_material_id=sm.id,
+                    job_type=JobType.PROBE,
+                    status=JobStatus.PENDING,
+                )
+                session.add(probe_job)
+                session.flush()
+                celery_result = probe_metadata.delay(str(sm.id), str(probe_job.id))
+                probe_job.celery_task_id = celery_result.id
+                session.flush()
+
+                return str(sm.id)
+
+            except Exception as exc:
+                mark_failed(session, job, sm, error=f"{type(exc).__name__}: {exc}")
+                raise

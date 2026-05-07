@@ -1,1 +1,1 @@
-"""Task modules. Sprint 0 ships health only; other tasks come per-sprint."""
+"""Task modules — registered as Celery tasks via celery_app autodiscovery."""
