@@ -41,8 +41,8 @@ infra/traefik/certs/*.key
 *.log
 *.pid
 
-# ML models / large files
-models/
+# ML models / large files (root-level only — NOT services/*/db/models/)
+/models/
 *.bin
 *.gguf
 *.safetensors
