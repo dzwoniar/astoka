@@ -49,7 +49,7 @@ jobs:
 
       - name: Mypy (worker)
         working-directory: services/worker
-        run: mypy astoka_worker
+        run: mypy --config-file mypy.ini astoka_worker
 
       - name: Pytest (highlight vendor)
         run: pytest services/highlight/tests -v

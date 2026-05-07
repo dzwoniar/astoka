@@ -4,7 +4,7 @@ Queue topology (NFR-REL-01, RNDR-08):
 - `default`     — generic / cleanup tasks
 - `asr`         — Whisper transcription (GPU-bound, sequential per device)
 - `highlight`   — heuristics + LLM reranking (GPU + Ollama)
-- `render`      — FFmpeg/NVENC export (GPU encoder, 1× engine)
+- `render`      — FFmpeg/NVENC export (GPU encoder, single engine)
 
 Sprint 0 wires only `default`. Other queues come online with their respective sprints.
 """
