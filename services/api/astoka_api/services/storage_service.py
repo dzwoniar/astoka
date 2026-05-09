@@ -1,4 +1,19 @@
-"""MinIO client wrapper. Used by API for presigned URLs, by worker for direct put/get."""
+"""MinIO client wrapper.
+
+Two clients are needed because Docker container DNS (`minio:9000`) is unreachable
+from the user's browser. The browser uploads/downloads via presigned URLs which
+embed the endpoint hostname; those must point at a host the browser can resolve
+(e.g. `localhost:9000` in dev, `minio.example.com` in prod).
+
+- `get_minio_client()`         — internal endpoint, used for server-side ops
+                                  (bucket_exists, stat_object, put_object).
+- `get_public_minio_client()`  — public endpoint, used ONLY to mint presigned
+                                  PUT/GET URLs that the browser will call.
+
+Both share the same credentials + bucket. Region is hardcoded to `us-east-1`
+to skip minio-py's GetBucketLocation auto-discovery (the call which causes
+the 500 error reported by Janek).
+"""
 
 from datetime import timedelta
 from functools import lru_cache
@@ -10,12 +25,32 @@ from astoka_api.config import get_settings
 
 @lru_cache(maxsize=1)
 def get_minio_client() -> Minio:
+    """Internal client — uses `minio_endpoint` (server↔MinIO)."""
     settings = get_settings()
     return Minio(
         settings.minio_endpoint,
         access_key=settings.minio_root_user,
         secret_key=settings.minio_root_password,
         secure=settings.minio_secure,
+        region=settings.minio_region,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_public_minio_client() -> Minio:
+    """Public client — uses `minio_public_endpoint`. ONLY for presigned URLs.
+
+    Never call put_object/stat_object on this client from inside the API container
+    — it'd try to reach `localhost:9000` which is the host's loopback, not the
+    container network.
+    """
+    settings = get_settings()
+    return Minio(
+        settings.minio_public_endpoint,
+        access_key=settings.minio_root_user,
+        secret_key=settings.minio_root_password,
+        secure=settings.minio_secure,
+        region=settings.minio_region,
     )
 
 
@@ -45,7 +80,7 @@ def storage_key_for_thumbnail(source_material_id: str) -> str:
 def presign_upload_url(storage_key: str, ttl_minutes: int = 60) -> str:
     """Presigned PUT URL — browser uploads directly to MinIO, bypassing FastAPI."""
     settings = get_settings()
-    client = get_minio_client()
+    client = get_public_minio_client()
     return client.presigned_put_object(
         settings.minio_bucket,
         storage_key,
@@ -55,7 +90,7 @@ def presign_upload_url(storage_key: str, ttl_minutes: int = 60) -> str:
 
 def presign_download_url(storage_key: str, ttl_minutes: int = 60) -> str:
     settings = get_settings()
-    client = get_minio_client()
+    client = get_public_minio_client()
     return client.presigned_get_object(
         settings.minio_bucket,
         storage_key,

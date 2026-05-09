@@ -29,11 +29,19 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0")
 
     # === MinIO ===
+    # Internal endpoint (server↔MinIO) — used by API/worker for direct S3 ops.
     minio_endpoint: str = Field(default="localhost:9000")
+    # Browser-facing endpoint — embedded in presigned URLs so PUT/GET reaches MinIO
+    # from the user's browser (which can't resolve internal Docker DNS like `minio:9000`).
+    # In dev compose this is `localhost:9000`; in prod via Traefik it's e.g. `minio.example.com`.
+    minio_public_endpoint: str = Field(default="localhost:9000")
     minio_root_user: str = Field(default="astoka")
     minio_root_password: str = Field(default="changeme")
     minio_bucket: str = Field(default="astoka")
     minio_secure: bool = Field(default=False)
+    # Region forced to `us-east-1` so minio-py skips its GetBucketLocation auto-discovery
+    # call (which fails inside containers with non-public MinIO endpoints).
+    minio_region: str = Field(default="us-east-1")
 
     # === Auth ===
     api_secret_key: str = Field(default="changeme-generate-with-openssl-rand-hex-32")

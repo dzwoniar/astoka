@@ -1,7 +1,8 @@
 """ASR worker task: faster-whisper transcription with word_timestamps.
 
-Lazy model download — first run pulls distil-whisper-large-v3-pl (~1.5 GB)
-or falls back to large-v3-turbo (~1.6 GB) if PL distil isn't available.
+Lazy model download — first run pulls the configured WHISPER_MODEL (~1.5 GB
+for `medium`, ~3 GB for `large-v3`). Default is `medium` since it's the best
+quality/speed tradeoff for Polish per Janek's testing on Akademia recordings.
 
 GPU/CPU auto-fallback via try/except: CUDA → fp16; on failure → CPU int8.
 """
@@ -25,9 +26,14 @@ from astoka_worker.util.db import db_session
 from astoka_worker.util.events import publish_event
 from astoka_worker.util.storage import download_file
 
-# Default Polish model. Janek can override via WHISPER_MODEL env or per-project setting.
+# Default Whisper model. Janek can override via WHISPER_MODEL env (or per-project
+# setting in a future sprint). `medium` chosen as the quality/speed sweet spot
+# for Polish on RTX 4090 (PRD MET-06 target WER ≤10%); requires GPU for usable
+# throughput. Override examples:
+#   WHISPER_MODEL=Systran/faster-whisper-large-v3        — best quality, slower
+#   WHISPER_MODEL=Systran/faster-distil-whisper-large-v3 — faster, slightly worse
 DEFAULT_WHISPER_MODEL = os.environ.get(
-    "WHISPER_MODEL", "Systran/faster-distil-whisper-large-v3"
+    "WHISPER_MODEL", "Systran/faster-whisper-medium"
 )
 
 # Singleton — first call loads, subsequent calls reuse.

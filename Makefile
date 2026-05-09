@@ -18,6 +18,7 @@
 
 SHELL := /bin/bash
 COMPOSE_DEV := docker compose -f infra/docker-compose.dev.yml --env-file .env
+COMPOSE_DEV_GPU := docker compose -f infra/docker-compose.dev.yml -f infra/docker-compose.gpu.yml --env-file .env
 COMPOSE_PROD := docker compose -f infra/docker-compose.yml --env-file .env
 COMPOSE := $(COMPOSE_DEV)
 
@@ -51,18 +52,18 @@ bootstrap: ## Install local dev deps (Node + Python) — for non-Docker iteratio
 up: ## Start dev stack (no GPU; worker enabled)
 	$(COMPOSE_DEV) $(PROFILES) up -d
 
-up-gpu: ## Start dev stack with GPU profile (Ollama + worker)
-	$(COMPOSE_DEV) --profile gpu --profile worker up -d
+up-gpu: ## Start dev stack with GPU override (worker + Ollama on GPU)
+	$(COMPOSE_DEV_GPU) --profile gpu --profile worker up -d
 
 up-prod: ## Start production-style stack (Traefik + TLS — needs cert in infra/traefik/certs/)
 	$(COMPOSE_PROD) up -d
 
 down: ## Stop stack (preserves volumes)
-	$(COMPOSE_DEV) --profile gpu --profile worker down
+	$(COMPOSE_DEV_GPU) --profile gpu --profile worker down 2>/dev/null || $(COMPOSE_DEV) --profile gpu --profile worker down
 	$(COMPOSE_PROD) down 2>/dev/null || true
 
 down-volumes: ## Stop stack AND drop volumes (DESTRUCTIVE)
-	$(COMPOSE_DEV) --profile gpu --profile worker down -v
+	$(COMPOSE_DEV_GPU) --profile gpu --profile worker down -v 2>/dev/null || $(COMPOSE_DEV) --profile gpu --profile worker down -v
 	$(COMPOSE_PROD) down -v 2>/dev/null || true
 
 logs: ## Tail logs from all services

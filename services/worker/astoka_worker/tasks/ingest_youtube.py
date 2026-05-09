@@ -126,11 +126,12 @@ def download_youtube(self, source_material_id: str, job_id: str) -> str:
                     },
                 )
 
-                # Chain to probe.
+                # Chain to probe — see source_material_service._enqueue_probe for
+                # the same commit-before-delay pattern. The probe worker runs in a
+                # separate process; if we only flush, the new probe_job row isn't
+                # yet visible on its connection when the Redis task message arrives.
 
                 from astoka_api.db.models import Job, JobStatus, JobType
-
-                # Create probe job and trigger.
                 from astoka_worker.tasks.probe import probe_metadata
 
                 probe_job = Job(
@@ -139,13 +140,35 @@ def download_youtube(self, source_material_id: str, job_id: str) -> str:
                     status=JobStatus.PENDING,
                 )
                 session.add(probe_job)
-                session.flush()
+                session.commit()  # row durable + visible to probe worker
                 celery_result = probe_metadata.delay(str(sm.id), str(probe_job.id))
                 probe_job.celery_task_id = celery_result.id
-                session.flush()
+                session.commit()
 
                 return str(sm.id)
 
+            except yt_dlp.utils.DownloadError as exc:
+                # Map the most common yt-dlp errors to user-friendly Polish messages.
+                msg = str(exc).lower()
+                if "private" in msg:
+                    user_msg = "Wideo prywatne. Wgraj plik lokalnie zamiast linku."
+                elif "members-only" in msg or "members only" in msg:
+                    user_msg = "Wideo dla członków kanału. Wgraj plik lokalnie."
+                elif "geo-restrict" in msg or "not available in your country" in msg:
+                    user_msg = "Wideo zablokowane w tej lokalizacji."
+                elif "sign in to confirm" in msg or "bot" in msg:
+                    user_msg = (
+                        "YouTube wymaga weryfikacji bot. Spróbuj za parę minut "
+                        "lub wgraj plik lokalnie."
+                    )
+                elif "video unavailable" in msg or "removed" in msg:
+                    user_msg = "Wideo niedostępne lub usunięte."
+                elif "age" in msg and "restrict" in msg:
+                    user_msg = "Wideo z ograniczeniem wiekowym wymaga zalogowania."
+                else:
+                    user_msg = f"yt-dlp: {exc}"
+                mark_failed(session, job, sm, error=user_msg)
+                raise
             except Exception as exc:
                 mark_failed(session, job, sm, error=f"{type(exc).__name__}: {exc}")
                 raise
