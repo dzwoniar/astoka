@@ -94,19 +94,27 @@ async def create_youtube_job(
 
 
 async def _enqueue_probe(db: AsyncSession, sm: SourceMaterial) -> Job:
-    """Add probe job + signal worker via Celery."""
+    """Add probe job + signal worker via Celery.
+
+    CRITICAL: we COMMIT before calling .delay() — the worker runs in a separate
+    process/connection and will SELECT the Job row by id. If we only flush, the
+    row is visible to this session but not yet to the worker, and the task starts
+    instantly (Redis broker is fast). The commit guarantees the row is durable
+    and visible to all connections before the task message reaches the worker.
+    """
     job = await job_service.create_job(
         db,
         source_material_id=sm.id,
         job_type=JobType.PROBE,
     )
+    await db.commit()  # job + sm now durable & visible to worker DB connection
     # Lazy import to avoid pulling celery in tests.
     try:
         from astoka_worker.tasks.probe import probe_metadata
 
         result = probe_metadata.delay(str(sm.id), str(job.id))
         job.celery_task_id = result.id
-        await db.flush()
+        await db.commit()
     except ImportError:
         # Worker not installed in this env (e.g. tests) — leave job pending.
         pass
@@ -114,17 +122,19 @@ async def _enqueue_probe(db: AsyncSession, sm: SourceMaterial) -> Job:
 
 
 async def _enqueue_youtube_download(db: AsyncSession, sm: SourceMaterial) -> Job:
+    """Same commit-before-delay pattern as _enqueue_probe — see its docstring."""
     job = await job_service.create_job(
         db,
         source_material_id=sm.id,
         job_type=JobType.YOUTUBE_DOWNLOAD,
     )
+    await db.commit()  # see _enqueue_probe note
     try:
         from astoka_worker.tasks.ingest_youtube import download_youtube
 
         result = download_youtube.delay(str(sm.id), str(job.id))
         job.celery_task_id = result.id
-        await db.flush()
+        await db.commit()
     except ImportError:
         pass
     return job

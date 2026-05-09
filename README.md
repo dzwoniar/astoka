@@ -202,7 +202,10 @@ Decyzja gate (zielony/żółty/czerwony) udokumentowana w raporcie.
 |---|---|
 | `make install` zawiesza się na "Building images" | Pierwsza kompilacja faster-whisper deps (~3-5 min). Sprawdź `docker compose logs`. |
 | `docker: Error response from daemon: could not select device driver "nvidia"` | Brak NVIDIA Container Toolkit. Użyj `make install` zamiast `make install-gpu`. |
-| Worker crashes z `CUDA out of memory` | Tylko 24 GB VRAM. Ogranicz concurrent jobs lub przerwij równoległe runy. |
+| Worker crashes z `CUDA out of memory` | Tylko 24 GB VRAM. Ogranicz concurrent jobs lub przerwij równoległe runy. Zmniejsz model: `WHISPER_MODEL=Systran/faster-distil-whisper-large-v3` w `.env`. |
+| Upload pliku zwraca 500 / 403 | Sprawdź `MINIO_PUBLIC_ENDPOINT=localhost:9000` w `.env`. Browser musi widzieć ten adres (nie internal `minio:9000`). |
+| ASR jedzie powoli (~minuty na minutę video) | Worker leci na CPU. Użyj `make install-gpu` żeby wymusić CUDA. Sprawdź `make logs` — szukaj "device=cuda". |
+| YouTube link → "Wideo prywatne" / "bot detection" | Specyficzne yt-dlp errors. Wgraj plik lokalnie zamiast linku. |
 | `psql: FATAL: database "astoka" does not exist` | `make down-volumes && make install` (DESTRUCTIVE — usuwa dane). |
 | Web nie widzi API | Sprawdź `NEXT_PUBLIC_API_URL=http://localhost:8000` w `.env`. |
 | `make install` mówi "ports already allocated" | Inny serwis używa 3000/8000/5432. Zmień w `.env` lub zatrzymaj kolidujący serwis. |

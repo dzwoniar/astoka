@@ -1,0 +1,29 @@
+# Astoka — GPU override layered on top of docker-compose.dev.yml.
+#
+# Usage (always pair with `--profile gpu --profile worker`):
+#   docker compose -f infra/docker-compose.dev.yml \
+#                  -f infra/docker-compose.gpu.yml \
+#                  --profile gpu --profile worker --env-file .env up -d
+#
+# `make up-gpu` / `make install-gpu` add the -f flag and both profiles
+# automatically — see the Makefile.
+#
+# What this changes vs the base dev compose:
+#   - worker:  gets NVIDIA GPU reservation so faster-whisper picks CUDA
+#              (without this, the worker falls back to CPU int8 — ~10x slower).
+#
+# We do NOT touch Ollama's profile gating here — install-gpu passes
+# `--profile gpu` separately, which activates Ollama. Keeping the base
+# profile [gpu] avoids merge ambiguity across Compose versions.
+
+name: astoka-dev
+
+services:
+  worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

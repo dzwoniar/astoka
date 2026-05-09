@@ -18,6 +18,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 REPO_ROOT="$(pwd)"
+# Base compose; --gpu adds the GPU override (-f infra/docker-compose.gpu.yml).
 COMPOSE="docker compose -f infra/docker-compose.dev.yml --env-file .env"
 
 GPU=0
@@ -26,7 +27,11 @@ PROFILES=()
 
 for arg in "$@"; do
     case "$arg" in
-        --gpu) GPU=1; PROFILES+=(--profile gpu) ;;
+        --gpu)
+            GPU=1
+            COMPOSE="docker compose -f infra/docker-compose.dev.yml -f infra/docker-compose.gpu.yml --env-file .env"
+            PROFILES+=(--profile gpu)
+            ;;
         --no-worker) WORKER=0 ;;
         --help|-h)
             cat <<EOF
