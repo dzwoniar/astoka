@@ -16,8 +16,11 @@ dependencies = [
     "structlog>=24.4.0",
     "yt-dlp>=2025.1.0",
     "ffmpeg-python>=0.2.0",
-    # Worker shares ORM models with API to avoid duplication.
+    # Shared source-of-truth packages. Both installed as editable from sibling dirs
+    # so the worker container only needs one COPY for all three packages, and pip
+    # picks them up via [tool.uv.sources] paths below.
     "astoka-api",
+    "astoka-highlight",
     # ML deps (Phase C: ASR; Phase D: scene detect + audio scoring + LLM client):
     "faster-whisper>=1.0.3",
     "scenedetect>=0.6.4",
@@ -27,7 +30,10 @@ dependencies = [
 ]
 
 [tool.uv.sources]
+# Path deps resolved relative to /app inside the container (Docker build context
+# is `services/` parent — see infra/docker-compose.dev.yml worker block).
 astoka-api = { path = "../api", editable = true }
+astoka-highlight = { path = "../highlight", editable = true }
 
 [project.optional-dependencies]
 dev = [

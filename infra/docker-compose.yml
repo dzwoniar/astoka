@@ -152,8 +152,9 @@ services:
 
   worker:
     build:
-      context: ../services/worker
-      dockerfile: Dockerfile
+      # See docker-compose.dev.yml comment — parent context needed for path deps.
+      context: ../services
+      dockerfile: worker/Dockerfile
     container_name: astoka-worker
     env_file: ../.env
     environment:
@@ -175,9 +176,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    # astoka-highlight installed as pip package via parent-context build.
     volumes:
-      - ../services/worker:/app
-      - ../services/highlight:/app/highlight:ro
       - ../scripts:/app/scripts:ro
     networks: [astoka]
     restart: unless-stopped
@@ -202,6 +202,9 @@ services:
     env_file: ../.env
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      # Server-side rewrite target — Next.js inside web container reaches api
+      # via Docker DNS, not localhost. See docker-compose.dev.yml for context.
+      INTERNAL_API_URL: http://api:8000
     depends_on:
       api:
         condition: service_healthy

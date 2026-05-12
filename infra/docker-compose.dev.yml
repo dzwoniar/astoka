@@ -151,8 +151,12 @@ services:
   worker:
     profiles: [worker]
     build:
-      context: ../services/worker
-      dockerfile: Dockerfile
+      # Parent dir context lets the Dockerfile COPY sibling packages (api/, highlight/)
+      # which worker's path deps in pyproject.toml require. Building from
+      # `../services/worker` directly would put `../api` outside the build context
+      # → uv would fail with "Distribution not found at: file:///api".
+      context: ../services
+      dockerfile: worker/Dockerfile
     container_name: astoka-worker
     env_file: ../.env
     environment:
@@ -171,9 +175,9 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    volumes:
-      - ../services/worker:/app
-      - ../services/highlight:/app/highlight:ro
+    # No volume mounts — astoka-highlight is installed as a pip package now
+    # (see worker/pyproject.toml). For hot-reload during dev, rebuild the
+    # image with `make build` or mount /app/worker volume locally.
     networks: [astoka]
     restart: unless-stopped
 
@@ -184,7 +188,13 @@ services:
     container_name: astoka-web
     env_file: ../.env
     environment:
+      # Browser-facing (for any direct fetch from React; lib/api-client uses
+      # relative /api/* so this is rarely hit).
       NEXT_PUBLIC_API_URL: "http://localhost:8000"
+      # Server-side rewrite target — Next.js proxies /api/* to this inside the
+      # container. Must use Docker DNS name, NOT localhost (which would resolve
+      # to web container itself).
+      INTERNAL_API_URL: "http://api:8000"
     depends_on:
       api:
         condition: service_healthy

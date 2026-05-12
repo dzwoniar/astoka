@@ -27,13 +27,13 @@ def upgrade() -> None:
     op.create_table(
         "users",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("username", sa.String(64), nullable=False),
         sa.Column("password_hash", sa.String(255), nullable=False),
         sa.Column("is_admin", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("last_login_at", sa.DateTime(), nullable=True),
+        sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_users_username", "users", ["username"], unique=True)
 
@@ -41,8 +41,8 @@ def upgrade() -> None:
     op.create_table(
         "projects",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "owner_id",
             postgresql.UUID(as_uuid=True),
@@ -52,7 +52,7 @@ def upgrade() -> None:
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("client", sa.String(100), nullable=True),
         sa.Column("is_archived", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("archived_at", sa.DateTime(), nullable=True),
+        sa.Column("archived_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "settings",
             postgresql.JSONB(astext_type=sa.Text()),
@@ -69,8 +69,8 @@ def upgrade() -> None:
     op.create_table(
         "source_materials",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "project_id",
             postgresql.UUID(as_uuid=True),
@@ -118,8 +118,8 @@ def upgrade() -> None:
     op.create_table(
         "transcripts",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "source_material_id",
             postgresql.UUID(as_uuid=True),
@@ -164,8 +164,8 @@ def upgrade() -> None:
     op.create_table(
         "highlights",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "source_material_id",
             postgresql.UUID(as_uuid=True),
@@ -219,8 +219,8 @@ def upgrade() -> None:
     op.create_table(
         "clips",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "project_id",
             postgresql.UUID(as_uuid=True),
@@ -266,8 +266,8 @@ def upgrade() -> None:
     op.create_table(
         "edit_operations",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "clip_id",
             postgresql.UUID(as_uuid=True),
@@ -308,8 +308,8 @@ def upgrade() -> None:
     op.create_table(
         "jobs",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(), server_default=sa.func.now(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column(
             "source_material_id",
             postgresql.UUID(as_uuid=True),
@@ -351,8 +351,8 @@ def upgrade() -> None:
         ),
         sa.Column("progress", sa.Float(), nullable=False, server_default="0"),
         sa.Column("progress_message", sa.String(255), nullable=True),
-        sa.Column("started_at", sa.DateTime(), nullable=True),
-        sa.Column("finished_at", sa.DateTime(), nullable=True),
+        sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("error_message", sa.Text(), nullable=True),
         sa.Column(
             "result",
