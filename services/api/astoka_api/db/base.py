@@ -6,7 +6,7 @@ get random names and migrations become noisy diffs.
 
 from datetime import datetime
 
-from sqlalchemy import MetaData, func
+from sqlalchemy import DateTime, MetaData, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 NAMING_CONVENTION = {
@@ -23,13 +23,20 @@ class Base(DeclarativeBase):
 
 
 class TimestampMixin:
-    """`created_at` + `updated_at` for every entity that needs audit trail."""
+    """`created_at` + `updated_at` for every entity that needs audit trail.
+
+    TIMESTAMPTZ everywhere — all timestamps are timezone-aware (UTC).
+    Code that sets these manually MUST use `datetime.now(UTC)` (tz-aware).
+    Comparing tz-aware to TIMESTAMP WITHOUT TIME ZONE raises asyncpg errors.
+    """
 
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,

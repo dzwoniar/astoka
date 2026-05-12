@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Enum, Float, ForeignKey, String, Text
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -54,9 +54,20 @@ class Job(Base, TimestampMixin):
     # Celery task ID (for Flower / cancellation).
     celery_task_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
-    job_type: Mapped[JobType] = mapped_column(Enum(JobType, name="job_type"), nullable=False)
+    job_type: Mapped[JobType] = mapped_column(
+        Enum(
+            JobType,
+            name="job_type",
+            values_callable=lambda enum_class: [e.value for e in enum_class],
+        ),
+        nullable=False,
+    )
     status: Mapped[JobStatus] = mapped_column(
-        Enum(JobStatus, name="job_status"),
+        Enum(
+            JobStatus,
+            name="job_status",
+            values_callable=lambda enum_class: [e.value for e in enum_class],
+        ),
         nullable=False,
         default=JobStatus.PENDING,
         index=True,
@@ -67,8 +78,8 @@ class Job(Base, TimestampMixin):
     # Free-form short message: "Pobieram model... 60%", "Transkrybuję chunk 3/5".
     progress_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Per-job result/output payload (e.g. transcript_id, highlight_count).

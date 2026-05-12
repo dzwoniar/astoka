@@ -6,12 +6,24 @@ const nextConfig = {
     typedRoutes: true,
   },
   async rewrites() {
-    // Local dev: proxy /api/* to FastAPI. In production Traefik handles routing.
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    // Next.js rewrites run SERVER-SIDE (inside the web container). So "localhost"
+    // here means the web container itself, not the api container. Use the internal
+    // Docker DNS name `api:8000` when running in compose.
+    //
+    // Two env vars on purpose:
+    //   - INTERNAL_API_URL    → server-side rewrite target (this function)
+    //   - NEXT_PUBLIC_API_URL → browser-facing URL, used by `lib/api-client.ts`
+    //                          for any direct fetch that bypasses Next rewrites.
+    // The browser still hits `/api/*` (relative) by default, so most calls go
+    // through these rewrites and never see NEXT_PUBLIC_API_URL.
+    const internalApiUrl =
+      process.env.INTERNAL_API_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      "http://localhost:8000";
     return [
       {
         source: "/api/:path*",
-        destination: `${apiUrl}/:path*`,
+        destination: `${internalApiUrl}/:path*`,
       },
     ];
   },

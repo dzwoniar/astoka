@@ -37,7 +37,15 @@ class SourceMaterial(Base, TimestampMixin):
         index=True,
     )
     source_type: Mapped[SourceType] = mapped_column(
-        Enum(SourceType, name="source_type"), nullable=False
+        # values_callable forces SQLAlchemy to insert enum VALUES ("upload"/"youtube"),
+        # not member names ("UPLOAD"/"YOUTUBE"). Without it Postgres rejects the row
+        # because the ENUM type was created with lowercase values in 0001_initial.
+        Enum(
+            SourceType,
+            name="source_type",
+            values_callable=lambda enum_class: [e.value for e in enum_class],
+        ),
+        nullable=False,
     )
 
     # === Identity / origin ===

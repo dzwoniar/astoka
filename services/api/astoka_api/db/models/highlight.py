@@ -72,7 +72,11 @@ class Highlight(Base, TimestampMixin):
     )
 
     status: Mapped[HighlightStatus] = mapped_column(
-        Enum(HighlightStatus, name="highlight_status"),
+        Enum(
+            HighlightStatus,
+            name="highlight_status",
+            values_callable=lambda enum_class: [e.value for e in enum_class],
+        ),
         nullable=False,
         default=HighlightStatus.PENDING,
         index=True,
