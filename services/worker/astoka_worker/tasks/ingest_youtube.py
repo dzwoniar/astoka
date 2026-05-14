@@ -15,6 +15,7 @@ from astoka_worker.tasks._helpers import (
     update_progress,
 )
 from astoka_worker.util.db import db_session
+from astoka_worker.util.events import publish_event
 from astoka_worker.util.storage import upload_file
 
 
@@ -30,47 +31,72 @@ def download_youtube(self, source_material_id: str, job_id: str) -> str:
             mark_failed(session, job, sm, error="No youtube_url")
             raise RuntimeError("no youtube_url")
 
+        # Capture IDs needed by progress_hook BEFORE leaving the SQLAlchemy
+        # session scope. The hook intentionally never touches the DB — see
+        # the docstring inside `progress_hook` below.
+        project_id_str = str(sm.project_id)
+        sm_id_str = str(sm.id)
+        job_id_str = str(job.id)
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_template = str(Path(tmpdir) / "%(id)s.%(ext)s")
 
-            # Progress hook receives dicts from yt-dlp during download.
             last_pct: dict[str, float] = {"v": 0.0}
 
             def progress_hook(d: dict[str, Any]) -> None:
+                """Best-effort progress reporting from yt-dlp.
+
+                CRITICAL: do NOT open a DB session inside this callback.
+                The hook fires inline on yt-dlp's download path. Earlier code
+                opened a fresh `db_session()` per progress event, which under
+                Celery's prefork pool deadlocked at ~6.5% — psycopg2 connections
+                inherited across fork() were poisoned, and the inner flush()
+                blocked the download thread forever.
+
+                Instead: publish a JSON event to Redis only (sync redis client,
+                fresh connection per call, swallows errors). The SSE listener
+                in the API reads from the same channel and updates the UI live.
+                Job.progress in the DB stays at 0.05 until mark_succeeded /
+                mark_failed at the end — acceptable for MVP, SSE feed is real.
+                """
                 if d.get("status") != "downloading":
                     return
                 total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
                 downloaded = d.get("downloaded_bytes") or 0
-                if total > 0:
-                    pct = downloaded / total
-                    # Throttle UI updates to ~5% steps.
-                    if pct - last_pct["v"] >= 0.05:
-                        last_pct["v"] = pct
-                        # Map download progress to 0.05..0.85 of the job.
-                        scaled = 0.05 + pct * 0.8
-                        # Use a fresh session via SQLAlchemy detached flush.
-                        with db_session() as inner:
-                            from astoka_api.db.models import Job, SourceMaterial
-
-                            inner_job = inner.get(Job, job.id)
-                            inner_sm = inner.get(SourceMaterial, sm.id)
-                            if inner_job and inner_sm:
-                                update_progress(
-                                    inner,
-                                    inner_job,
-                                    inner_sm,
-                                    progress=scaled,
-                                    message=f"Pobieram z YouTube... {pct:.0%}",
-                                )
+                if total <= 0:
+                    return
+                pct = downloaded / total
+                # Throttle Redis publishes to ~5% steps.
+                if pct - last_pct["v"] < 0.05:
+                    return
+                last_pct["v"] = pct
+                scaled = 0.05 + pct * 0.8  # 0.05..0.85 of the overall job
+                publish_event(
+                    project_id_str,
+                    {
+                        "event": "job_update",
+                        "project_id": project_id_str,
+                        "source_material_id": sm_id_str,
+                        "job_id": job_id_str,
+                        "job_type": "youtube_download",
+                        "status": "running",
+                        "progress": scaled,
+                        "progress_message": f"Pobieram z YouTube... {pct:.0%}",
+                        "error_message": None,
+                    },
+                )
 
             ydl_opts = {
                 "outtmpl": output_template,
-                "format": "bestvideo[height<=1080]+bestaudio/best",
-                "merge_output_format": "mp4",
+                # Single pre-muxed stream so yt-dlp doesn't spawn ffmpeg to
+                # merge bestvideo+bestaudio. The merge subprocess inherits
+                # Celery's stdio FDs and hangs on write() in prefork pool.
+                # Trade-off: capped at whatever pre-muxed quality YouTube
+                # serves (usually 720p H.264 + AAC, fine for MVP).
+                "format": "best[height<=1080][ext=mp4]/best[height<=1080]/best",
                 "noplaylist": True,
                 "quiet": True,
                 "progress_hooks": [progress_hook],
-                # Get thumbnail too.
                 "writethumbnail": True,
             }
 
