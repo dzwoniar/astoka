@@ -73,7 +73,7 @@ async def list_projects(
     stmt = stmt.order_by(sort_column.desc() if sort_desc else sort_column.asc())
 
     result = await db.execute(stmt)
-    rows = result.all()
+    rows = result.tuples().all()
 
     items = [_project_to_response(p, sm, cl) for p, sm, cl in rows]
     return items, len(items)

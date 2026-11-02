@@ -71,7 +71,7 @@ Domyślne adresy:
 
 Login demonstracyjny to **`admin` / `admin`**. Konto jest zakodowane w [skrypcie seed](services/api/astoka_api/cli/seed.py), więc zmiana samych sekretów `.env` nie zmienia jego hasła.
 
-Compose publikuje porty web/API/MinIO oraz PostgreSQL i Redis bez ograniczenia do `127.0.0.1`. Domyślne porty to `3000`, `8000`, `9000`, `9001`, `5432`, `6379`, a z Ollama także `11434`. To konfiguracja demonstracyjna: przed udostępnieniem poza własnym komputerem wymagane są zmiana danych dostępowych i ograniczenie ekspozycji usług.
+Compose dev wiąże porty web/API/MinIO oraz PostgreSQL, Redis i Ollama z `127.0.0.1`, więc są dostępne lokalnie na hoście. Domyślne porty to `3000`, `8000`, `9000`, `9001`, `5432`, `6379`, a z Ollama także `11434`. To konfiguracja demonstracyjna: przed udostępnieniem poza własnym komputerem wymagane są zmiana danych dostępowych i osobna konfiguracja dostępu.
 
 ### Tryb GPU i Ollama
 
@@ -154,7 +154,7 @@ make seed           # założenie konta demo, jeśli nie istnieje
 
 Do pracy poza kontenerami repo deklaruje Node.js 20+, pnpm 9.12.0, Python 3.11–3.12 i uv. `make bootstrap` instaluje zależności lokalne. Polecenia `make test`, `make lint` i `make type-check` uruchamiają narzędzia na hoście, więc wymagają zainstalowanych zależności testowych i developerskich; samo `make install` ich tam nie zapewnia.
 
-Istnieją testy API, smoke test workera i testy chunkingu/deduplikacji. Frontend ma skrypty Vitest i Playwright, ale nie zawiera jeszcze zestawu testów web ani scenariuszy E2E. [CI](.github/workflows/ci.yml) definiuje kontrole Python, lint/type-check web i walidację alternatywnego pliku Compose. To nie zastępuje weryfikacji pełnego przepływu z wideo i modelami.
+Istnieją testy API, smoke test workera i testy chunkingu/deduplikacji. Frontend ma skrypty Vitest i Playwright, ale nie zawiera jeszcze zestawu testów web ani scenariuszy E2E. [CI](.github/workflows/ci.yml) definiuje kontrole Python, lint/type-check/build web z zamrożonym plikiem blokady oraz walidację plików Compose dev, dev z GPU i alternatywnego stacku. To nie zastępuje weryfikacji pełnego przepływu z wideo i modelami.
 
 ### Pomiar jakości ASR
 
@@ -165,6 +165,10 @@ python scripts/asr_spike.py --samples-dir scripts/data/akademia_samples
 ```
 
 Cel `make asr-spike` wskazuje `/app/scripts/asr_spike.py`, lecz domyślny Compose dev nie montuje katalogu `scripts` do workera. Użycie tej ścieżki kontenerowej wymaga dodatkowej konfiguracji mountów; nie jest gotowym krokiem po samym `make install`.
+
+## Przed wdrożeniem publicznym
+
+Ten snapshot służy do lokalnej demonstracji. Next.js 14 i starsze narzędzia testowe wymagają migracji do utrzymywanych wersji oraz ponownego audytu zależności przed wdrożeniem na publiczny serwer. Aktualizacja poprawkowa w linii 14 nie usuwa wszystkich zgłoszonych podatności. Konto demo i ustawienia infrastruktury również wymagają osobnego przygotowania do takiego wdrożenia.
 
 ## Rozwiązywanie problemów
 
