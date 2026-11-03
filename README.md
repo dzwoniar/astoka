@@ -24,7 +24,7 @@ Ocena highlightu jest wynikiem algorytmu lub modelu, a nie pomiarem zasięgu pub
 
 | Warstwa | Technologie |
 |---|---|
-| Web | Next.js 14 App Router, React 18, TypeScript, Tailwind CSS, komponenty oparte na Radix/shadcn |
+| Web | Next.js 16 App Router, React 19, TypeScript, Tailwind CSS, komponenty oparte na Radix/shadcn |
 | API | FastAPI, Pydantic 2, SQLAlchemy 2, Alembic, JWT i cookie |
 | Zadania | Celery 5, Redis 7, yt-dlp, FFmpeg/ffprobe, faster-whisper |
 | Dane | PostgreSQL 16 z pgvector, MinIO zgodne z S3 |
@@ -152,9 +152,9 @@ make seed           # założenie konta demo, jeśli nie istnieje
 
 `make down-volumes` usuwa również dane w wolumenach; nie jest zwykłą procedurą restartu. `make up-prod` uruchamia alternatywny plik Compose z Traefik/TLS, Flower i innymi ustawieniami, wymagający osobnej konfiguracji. Nazwa celu nie oznacza gotowości aplikacji do eksploatacji produkcyjnej.
 
-Do pracy poza kontenerami repo deklaruje Node.js 20+, pnpm 9.12.0, Python 3.11–3.12 i uv. `make bootstrap` instaluje zależności lokalne. Polecenia `make test`, `make lint` i `make type-check` uruchamiają narzędzia na hoście, więc wymagają zainstalowanych zależności testowych i developerskich; samo `make install` ich tam nie zapewnia.
+Do pracy poza kontenerami repo deklaruje Node.js 24+, pnpm 9.12.0, Python 3.11–3.12 i uv. `make bootstrap` instaluje zależności lokalne. Polecenia `make test`, `make lint` i `make type-check` uruchamiają narzędzia na hoście, więc wymagają zainstalowanych zależności testowych i developerskich; samo `make install` ich tam nie zapewnia.
 
-Istnieją testy API, smoke test workera i testy chunkingu/deduplikacji. Frontend ma skrypty Vitest i Playwright, ale nie zawiera jeszcze zestawu testów web ani scenariuszy E2E. [CI](.github/workflows/ci.yml) definiuje kontrole Python, lint/type-check/build web z zamrożonym plikiem blokady oraz walidację plików Compose dev, dev z GPU i alternatywnego stacku. To nie zastępuje weryfikacji pełnego przepływu z wideo i modelami.
+Istnieją testy API, smoke test workera i testy chunkingu/deduplikacji; `make test` uruchamia te testy Python. Frontend nie zawiera jeszcze zestawu testów web ani scenariuszy E2E, więc nie deklaruje nieużywanych runnerów testowych. [CI](.github/workflows/ci.yml) definiuje kontrole Python, audyt zależności produkcyjnych web, lint/type-check/build web z zamrożonym plikiem blokady oraz walidację plików Compose dev, dev z GPU i alternatywnego stacku. To nie zastępuje weryfikacji pełnego przepływu z wideo i modelami.
 
 ### Pomiar jakości ASR
 
@@ -168,7 +168,7 @@ Cel `make asr-spike` wskazuje `/app/scripts/asr_spike.py`, lecz domyślny Compos
 
 ## Przed wdrożeniem publicznym
 
-Ten snapshot służy do lokalnej demonstracji. Next.js 14 i starsze narzędzia testowe wymagają migracji do utrzymywanych wersji oraz ponownego audytu zależności przed wdrożeniem na publiczny serwer. Aktualizacja poprawkowa w linii 14 nie usuwa wszystkich zgłoszonych podatności. Konto demo i ustawienia infrastruktury również wymagają osobnego przygotowania do takiego wdrożenia.
+Ten snapshot służy do lokalnej demonstracji. Web używa utrzymywanej linii Next.js 16 i React 19; CI sprawdza znane podatności produkcyjnych zależności web z pliku blokady. [Opis migracji i ograniczeń audytu](docs/web-security.md) zawiera również pozostałe zgłoszenie narzędzi developerskich. Przed wdrożeniem na publiczny serwer trzeba ponowić audyt i osobno przygotować konto demo oraz ustawienia infrastruktury. Wynik audytu zależności nie oznacza gotowości całej aplikacji do eksploatacji produkcyjnej.
 
 ## Rozwiązywanie problemów
 

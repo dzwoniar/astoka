@@ -6,7 +6,7 @@
 |---|---|---|
 | Docker | 24+ | `docker --version` |
 | Docker Compose | 2.20+ | `docker compose version` |
-| Node | 20 | `node -v` |
+| Node | 24 LTS | `node -v` |
 | pnpm | 9.12 | `pnpm -v` |
 | Python | 3.11 | `python --version` |
 | uv | latest | `uv --version` |

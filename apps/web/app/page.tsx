@@ -18,26 +18,27 @@ function ProjectsList() {
   const [archiveFilter, setArchiveFilter] = React.useState<ArchiveFilter>("active");
   const [sortBy, setSortBy] = React.useState<ProjectSortField>("updated_at");
 
-  const load = React.useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await projectsApi.list({
+  React.useEffect(() => {
+    let active = true;
+    projectsApi
+      .list({
         archive_filter: archiveFilter,
         sort_by: sortBy,
         sort_desc: true,
+      })
+      .then((res) => {
+        if (active) setProjects(res.items);
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : "Failed to load");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
-      setProjects(res.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
-    }
+    return () => {
+      active = false;
+    };
   }, [archiveFilter, sortBy]);
-
-  React.useEffect(() => {
-    void load();
-  }, [load]);
 
   return (
     <main className="container py-8">
@@ -59,7 +60,11 @@ function ProjectsList() {
       <div className="mb-4 flex flex-wrap gap-2">
         <select
           value={archiveFilter}
-          onChange={(e) => setArchiveFilter(e.target.value as ArchiveFilter)}
+          onChange={(e) => {
+            setLoading(true);
+            setError(null);
+            setArchiveFilter(e.target.value as ArchiveFilter);
+          }}
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
         >
           <option value="active">Aktywne</option>
@@ -68,7 +73,11 @@ function ProjectsList() {
         </select>
         <select
           value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as ProjectSortField)}
+          onChange={(e) => {
+            setLoading(true);
+            setError(null);
+            setSortBy(e.target.value as ProjectSortField);
+          }}
           className="rounded-md border border-input bg-background px-3 py-1.5 text-sm"
         >
           <option value="updated_at">Sortuj: ostatnia modyfikacja</option>

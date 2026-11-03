@@ -12,8 +12,7 @@ export function useProjectEvents(
   onEvent: ProjectEventHandler,
 ): { connected: boolean } {
   const [connected, setConnected] = React.useState(false);
-  const handlerRef = React.useRef(onEvent);
-  handlerRef.current = onEvent;
+  const handleEvent = React.useEffectEvent(onEvent);
 
   React.useEffect(() => {
     if (!projectId) return;
@@ -27,7 +26,7 @@ export function useProjectEvents(
     const onMessage = (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as JobUpdateEvent;
-        handlerRef.current(data);
+        handleEvent(data);
       } catch {
         // Ignore malformed payloads.
       }

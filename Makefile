@@ -13,7 +13,7 @@
         bootstrap up up-prod up-gpu down down-volumes logs ps restart \
         api-shell worker-shell web-shell db-shell \
         migrate migrate-create seed \
-        test test-api test-web test-highlight lint type-check \
+        test test-api test-worker test-highlight lint type-check \
         codegen asr-spike clean
 
 SHELL := /bin/bash
@@ -102,7 +102,7 @@ seed: ## Seed initial data (1 admin user — admin/admin)
 
 # ============ Test / lint ============
 
-test: test-api test-worker test-highlight test-web ## Run all tests
+test: test-api test-worker test-highlight ## Run existing Python tests (web has no test suite yet)
 
 test-api: ## Run backend api tests
 	cd services/api && pytest tests -v
@@ -112,9 +112,6 @@ test-worker: ## Run worker tests
 
 test-highlight: ## Run highlight (vendor) tests
 	cd services/highlight && pytest tests -v
-
-test-web: ## Run web tests
-	pnpm --filter @astoka/web test
 
 lint: ## Lint all code
 	pnpm -r lint
