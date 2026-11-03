@@ -1,7 +1,7 @@
-# Astoka web — Next.js 14 App Router.
+# Astoka web — Next.js 16 App Router.
 # Dev mode (hot reload) for MVP; standalone build comes in Sprint 9.
 
-FROM node:20-alpine
+FROM node:24-alpine
 
 WORKDIR /app
 

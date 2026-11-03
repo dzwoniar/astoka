@@ -33,10 +33,12 @@ export function HighlightList({ projectId, refreshKey }: Props) {
   const [busy, setBusy] = React.useState<string | null>(null);
 
   const load = React.useCallback(() => {
-    setLoading(true);
     highlightsApi
       .list(projectId, false)
-      .then(setHighlights)
+      .then((items) => {
+        setHighlights(items);
+        setError(null);
+      })
       .catch((err) => setError(err instanceof HttpError ? err.detail : "Failed"))
       .finally(() => setLoading(false));
   }, [projectId]);
@@ -52,6 +54,7 @@ export function HighlightList({ projectId, refreshKey }: Props) {
     setBusy(id);
     try {
       await fn(id);
+      setLoading(true);
       load();
     } finally {
       setBusy(null);

@@ -32,22 +32,23 @@ function ProjectDetail() {
   const [error, setError] = React.useState<string | null>(null);
   const [archiving, setArchiving] = React.useState(false);
 
-  const refresh = React.useCallback(async () => {
+  const refresh = React.useCallback(() => {
     if (!id) return;
-    try {
-      const [p, sms, js] = await Promise.all([
+    return Promise.all([
         projectsApi.get(id),
         ingestApi.listSourceMaterials(id),
         ingestApi.listJobs(id),
-      ]);
-      setProject(p);
-      setSourceMaterials(sms);
-      setJobs(js);
-    } catch (err) {
-      setError(err instanceof HttpError ? err.detail : "Failed to load project");
-    } finally {
-      setLoading(false);
-    }
+      ])
+      .then(([p, sms, js]) => {
+        setProject(p);
+        setSourceMaterials(sms);
+        setJobs(js);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof HttpError ? err.detail : "Failed to load project");
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   React.useEffect(() => {

@@ -2,9 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   output: "standalone",
-  experimental: {
-    typedRoutes: true,
-  },
+  typedRoutes: true,
   async rewrites() {
     // Next.js rewrites run SERVER-SIDE (inside the web container). So "localhost"
     // here means the web container itself, not the api container. Use the internal
