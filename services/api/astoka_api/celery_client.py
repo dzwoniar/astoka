@@ -40,13 +40,32 @@ class TaskNames:
 
 @lru_cache(maxsize=1)
 def _client() -> Celery:
-    """Lightweight Celery app for sending messages — no task registry, no worker."""
+    """Lightweight Celery app for sending messages — no task registry, no worker.
+
+    CRITICAL: must mirror the worker's broker/queue config (see
+    `services/worker/astoka_worker/celery_app.py`). If queue/serializer/content
+    settings drift between the two sides, messages reach Redis but live in the
+    wrong queue and the worker silently never consumes them.
+
+    Specifically `task_default_queue="default"` matches the worker side.
+    Without it, Celery defaults to queue name `"celery"` here while the worker
+    listens on `"default"` — every task gets stuck on the broker forever.
+    """
     settings = get_settings()
-    return Celery(
+    app = Celery(
         "astoka-api",
         broker=settings.redis_url,
         backend=settings.redis_url,
     )
+    app.conf.update(
+        task_default_queue="default",
+        task_serializer="json",
+        accept_content=["json"],
+        result_serializer="json",
+        timezone="UTC",
+        enable_utc=True,
+    )
+    return app
 
 
 def send_task(
